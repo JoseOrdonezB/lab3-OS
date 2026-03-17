@@ -1,0 +1,48 @@
+# ===== Compilados de C =====
+*.o
+*.out
+*.a
+*.so
+*.exe
+*.elf
+
+# ===== Archivos temporales =====
+*.log
+*.tmp
+*.swp
+*~
+*.bak
+
+# ===== Archivos de editor =====
+.vscode/
+.idea/
+*.code-workspace
+
+# Vim
+*.swp
+*.swo
+
+# Emacs
+*~
+
+# ===== Sistema =====
+.DS_Store
+Thumbs.db
+
+# ===== Archivos de compilación =====
+Makefile.old
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+
+# ===== Archivos de VM / binarios pesados (opcional) =====
+*.iso
+*.img
+*.vdi
+*.vmdk
+
+# ===== Archivos personales =====
+*.pdf
+*.docx
+*.pptx
