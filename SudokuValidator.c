@@ -58,16 +58,18 @@ int verificar_subcuadro(int fila_inicio, int col_inicio) {
 
 void *verificar_columnas_thread(void *arg) {
 
-    printf("Thread de columnas ejecutándose. TID: %ld\n", syscall(SYS_gettid));
+    long tid = syscall(SYS_gettid);
+
+    printf("El thread que ejecuta la revision de columnas es: %ld\n", tid);
 
     for (int i = 0; i < 9; i++) {
+        printf("En la revision de columnas el siguiente es un thread en ejecucion: %ld\n", tid);
+
         if (!verificar_columna(i)) {
             columnas_validas = 0;
             pthread_exit(0);
         }
     }
-
-    printf("Columnas válidas\n");
 
     pthread_exit(0);
 }
@@ -128,9 +130,14 @@ int main(int argc, char *argv[]) {
     pthread_create(&hilo_columnas, NULL, verificar_columnas_thread, NULL);
     pthread_join(hilo_columnas, NULL);
 
+    printf("El thread en el que se ejecuta main es: %ld\n", syscall(SYS_gettid));
+
     int filas_validas = 1;
 
     for (int i = 0; i < 9; i++) {
+
+        printf("Revisando fila %d en thread principal...\n", i);
+
         if (!verificar_fila(i)) {
             filas_validas = 0;
             break;
@@ -149,7 +156,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (columnas_validas && filas_validas && subcuadros_validos) {
-        printf("Sudoku válido\n");
+        printf("Sudoku Resuelto\n");
     } else {
         printf("Sudoku inválido\n");
     }
