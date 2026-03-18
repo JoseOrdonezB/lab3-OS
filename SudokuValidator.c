@@ -3,6 +3,10 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <pthread.h>
+#include <sys/syscall.h>
 
 int sudoku[9][9];
 
@@ -12,12 +16,11 @@ int verificar_fila(int fila) {
     for (int j = 0; j < 9; j++) {
         int num = sudoku[fila][j];
 
-        if (num < 1 || num > 9 || visto[num] == 1)
+        if (num < 1 || num > 9 || visto[num])
             return 0;
 
         visto[num] = 1;
     }
-
     return 1;
 }
 
@@ -27,12 +30,11 @@ int verificar_columna(int col) {
     for (int i = 0; i < 9; i++) {
         int num = sudoku[i][col];
 
-        if (num < 1 || num > 9 || visto[num] == 1)
+        if (num < 1 || num > 9 || visto[num])
             return 0;
 
         visto[num] = 1;
     }
-
     return 1;
 }
 
@@ -43,14 +45,39 @@ int verificar_subcuadro(int fila_inicio, int col_inicio) {
         for (int j = col_inicio; j < col_inicio + 3; j++) {
             int num = sudoku[i][j];
 
-            if (num < 1 || num > 9 || visto[num] == 1)
+            if (num < 1 || num > 9 || visto[num])
                 return 0;
 
             visto[num] = 1;
         }
     }
-
     return 1;
+}
+
+void *verificar_columnas_thread(void *arg) {
+    for (int i = 0; i < 9; i++) {
+        if (!verificar_columna(i)) {
+            printf("Columnas inválidas\n");
+            pthread_exit((void*)0);
+        }
+    }
+    pthread_exit((void*)1);
+}
+
+void ejecutar_ps(pid_t pid_padre) {
+    pid_t pid = fork();
+
+    if (pid == 0) {
+        char pid_str[20];
+        sprintf(pid_str, "%d", pid_padre);
+
+        execlp("ps", "ps", "-p", pid_str, "-lLf", NULL);
+
+        perror("Error en execlp");
+        exit(1);
+    } else {
+        wait(NULL);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -76,23 +103,45 @@ int main(int argc, char *argv[]) {
         sudoku[i / 9][i % 9] = data[i] - '0';
     }
 
+    pid_t pid_padre = getpid();
+
+    ejecutar_ps(pid_padre);
+
+    pthread_t hilo_columnas;
+    void *resultado_columnas;
+
+    pthread_create(&hilo_columnas, NULL, verificar_columnas_thread, NULL);
+    pthread_join(hilo_columnas, &resultado_columnas);
+
+    printf("Thread ID actual: %ld\n", syscall(SYS_gettid));
+
+    int filas_validas = 1;
+
     for (int i = 0; i < 9; i++) {
-        if (!verificar_fila(i) || !verificar_columna(i)) {
-            printf("Sudoku inválido\n");
-            return 0;
+        if (!verificar_fila(i)) {
+            filas_validas = 0;
+            break;
         }
     }
+
+    int subcuadros_validos = 1;
 
     for (int i = 0; i < 9; i += 3) {
         for (int j = 0; j < 9; j += 3) {
             if (!verificar_subcuadro(i, j)) {
-                printf("Sudoku inválido\n");
-                return 0;
+                subcuadros_validos = 0;
+                break;
             }
         }
     }
 
-    printf("Sudoku válido\n");
+    if ((long)resultado_columnas && filas_validas && subcuadros_validos) {
+        printf("Sudoku válido\n");
+    } else {
+        printf("Sudoku inválido\n");
+    }
+
+    ejecutar_ps(pid_padre);
 
     munmap(data, 81);
     close(fd);
