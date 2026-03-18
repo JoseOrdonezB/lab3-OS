@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < 9; i++) {
         if (!verificar_fila(i) || !verificar_columna(i)) {
-            printf("Sudoku inválido ❌\n");
+            printf("Sudoku inválido\n");
             return 0;
         }
     }
@@ -86,13 +86,13 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < 9; i += 3) {
         for (int j = 0; j < 9; j += 3) {
             if (!verificar_subcuadro(i, j)) {
-                printf("Sudoku inválido ❌\n");
+                printf("Sudoku inválido\n");
                 return 0;
             }
         }
     }
 
-    printf("Sudoku válido ✅\n");
+    printf("Sudoku válido\n");
 
     munmap(data, 81);
     close(fd);
