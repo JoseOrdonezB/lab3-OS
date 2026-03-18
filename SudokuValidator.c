@@ -10,6 +10,8 @@
 
 int sudoku[9][9];
 
+int columnas_validas = 1;
+
 int verificar_fila(int fila) {
     int visto[10] = {0};
 
@@ -55,21 +57,34 @@ int verificar_subcuadro(int fila_inicio, int col_inicio) {
 }
 
 void *verificar_columnas_thread(void *arg) {
+
+    printf("Thread de columnas ejecutándose. TID: %ld\n", syscall(SYS_gettid));
+
     for (int i = 0; i < 9; i++) {
         if (!verificar_columna(i)) {
-            printf("Columnas inválidas\n");
-            pthread_exit((void*)0);
+            columnas_validas = 0;
+            pthread_exit(0);
         }
     }
-    pthread_exit((void*)1);
+
+    printf("Columnas válidas\n");
+
+    pthread_exit(0);
 }
 
 void ejecutar_ps(pid_t pid_padre) {
     pid_t pid = fork();
 
+    if (pid < 0) {
+        perror("Error en fork");
+        return;
+    }
+
     if (pid == 0) {
         char pid_str[20];
         sprintf(pid_str, "%d", pid_padre);
+
+        printf("\nEjecutando: ps -p %s -lLf\n\n", pid_str);
 
         execlp("ps", "ps", "-p", pid_str, "-lLf", NULL);
 
@@ -96,6 +111,7 @@ int main(int argc, char *argv[]) {
     char *data = mmap(NULL, 81, PROT_READ, MAP_PRIVATE, fd, 0);
     if (data == MAP_FAILED) {
         perror("Error en mmap");
+        close(fd);
         return 1;
     }
 
@@ -108,12 +124,9 @@ int main(int argc, char *argv[]) {
     ejecutar_ps(pid_padre);
 
     pthread_t hilo_columnas;
-    void *resultado_columnas;
 
     pthread_create(&hilo_columnas, NULL, verificar_columnas_thread, NULL);
-    pthread_join(hilo_columnas, &resultado_columnas);
-
-    printf("Thread ID actual: %ld\n", syscall(SYS_gettid));
+    pthread_join(hilo_columnas, NULL);
 
     int filas_validas = 1;
 
@@ -135,7 +148,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if ((long)resultado_columnas && filas_validas && subcuadros_validos) {
+    if (columnas_validas && filas_validas && subcuadros_validos) {
         printf("Sudoku válido\n");
     } else {
         printf("Sudoku inválido\n");
