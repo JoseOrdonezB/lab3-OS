@@ -83,6 +83,7 @@ void ejecutar_ps(pid_t pid_padre) {
 }
 
 int main(int argc, char *argv[]) {
+    omp_set_num_threads(1);
 
     if (argc < 2) {
         printf("Uso: %s archivo\n", argv[0]);
