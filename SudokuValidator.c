@@ -83,7 +83,6 @@ void ejecutar_ps(pid_t pid_padre) {
 }
 
 int main(int argc, char *argv[]) {
-    omp_set_num_threads(1);
 
     if (argc < 2) {
         printf("Uso: %s archivo\n", argv[0]);
@@ -119,7 +118,7 @@ int main(int argc, char *argv[]) {
 
     int filas_validas = 1;
 
-    #pragma omp parallel for reduction(&&:filas_validas)
+    #pragma omp parallel for schedule(dynamic) reduction(&&:filas_validas)
     for (int i = 0; i < 9; i++) {
         printf("Thread %d revisando fila %d\n", omp_get_thread_num(), i);
         filas_validas = filas_validas && verificar_fila(i);
@@ -127,7 +126,7 @@ int main(int argc, char *argv[]) {
 
     int subcuadros_validos = 1;
 
-    #pragma omp parallel for collapse(2) reduction(&&:subcuadros_validos)
+    #pragma omp parallel for collapse(2) schedule(dynamic) reduction(&&:subcuadros_validos)
     for (int i = 0; i < 9; i += 3) {
         for (int j = 0; j < 9; j += 3) {
             printf("Thread %d revisando subcuadro (%d,%d)\n",
