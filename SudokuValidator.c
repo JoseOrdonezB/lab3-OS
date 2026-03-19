@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include <pthread.h>
 #include <sys/syscall.h>
+#include <omp.h>
 
 int sudoku[9][9];
 
@@ -17,10 +18,7 @@ int verificar_fila(int fila) {
 
     for (int j = 0; j < 9; j++) {
         int num = sudoku[fila][j];
-
-        if (num < 1 || num > 9 || visto[num])
-            return 0;
-
+        if (num < 1 || num > 9 || visto[num]) return 0;
         visto[num] = 1;
     }
     return 1;
@@ -31,10 +29,7 @@ int verificar_columna(int col) {
 
     for (int i = 0; i < 9; i++) {
         int num = sudoku[i][col];
-
-        if (num < 1 || num > 9 || visto[num])
-            return 0;
-
+        if (num < 1 || num > 9 || visto[num]) return 0;
         visto[num] = 1;
     }
     return 1;
@@ -46,10 +41,7 @@ int verificar_subcuadro(int fila_inicio, int col_inicio) {
     for (int i = fila_inicio; i < fila_inicio + 3; i++) {
         for (int j = col_inicio; j < col_inicio + 3; j++) {
             int num = sudoku[i][j];
-
-            if (num < 1 || num > 9 || visto[num])
-                return 0;
-
+            if (num < 1 || num > 9 || visto[num]) return 0;
             visto[num] = 1;
         }
     }
@@ -59,11 +51,10 @@ int verificar_subcuadro(int fila_inicio, int col_inicio) {
 void *verificar_columnas_thread(void *arg) {
 
     long tid = syscall(SYS_gettid);
-
-    printf("El thread que ejecuta la revision de columnas es: %ld\n", tid);
+    printf("Thread columnas (pthread). TID: %ld\n", tid);
 
     for (int i = 0; i < 9; i++) {
-        printf("En la revision de columnas el siguiente es un thread en ejecucion: %ld\n", tid);
+        printf("Revisando columna %d en thread %ld\n", i, tid);
 
         if (!verificar_columna(i)) {
             columnas_validas = 0;
@@ -77,11 +68,6 @@ void *verificar_columnas_thread(void *arg) {
 void ejecutar_ps(pid_t pid_padre) {
     pid_t pid = fork();
 
-    if (pid < 0) {
-        perror("Error en fork");
-        return;
-    }
-
     if (pid == 0) {
         char pid_str[20];
         sprintf(pid_str, "%d", pid_padre);
@@ -89,8 +75,7 @@ void ejecutar_ps(pid_t pid_padre) {
         printf("\nEjecutando: ps -p %s -lLf\n\n", pid_str);
 
         execlp("ps", "ps", "-p", pid_str, "-lLf", NULL);
-
-        perror("Error en execlp");
+        perror("execlp");
         exit(1);
     } else {
         wait(NULL);
@@ -106,13 +91,13 @@ int main(int argc, char *argv[]) {
 
     int fd = open(argv[1], O_RDONLY);
     if (fd < 0) {
-        perror("Error al abrir archivo");
+        perror("open");
         return 1;
     }
 
     char *data = mmap(NULL, 81, PROT_READ, MAP_PRIVATE, fd, 0);
     if (data == MAP_FAILED) {
-        perror("Error en mmap");
+        perror("mmap");
         close(fd);
         return 1;
     }
@@ -125,40 +110,37 @@ int main(int argc, char *argv[]) {
 
     ejecutar_ps(pid_padre);
 
-    pthread_t hilo_columnas;
+    pthread_t hilo;
+    pthread_create(&hilo, NULL, verificar_columnas_thread, NULL);
+    pthread_join(hilo, NULL);
 
-    pthread_create(&hilo_columnas, NULL, verificar_columnas_thread, NULL);
-    pthread_join(hilo_columnas, NULL);
-
-    printf("El thread en el que se ejecuta main es: %ld\n", syscall(SYS_gettid));
+    printf("Thread main TID: %ld\n", syscall(SYS_gettid));
 
     int filas_validas = 1;
 
+    #pragma omp parallel for reduction(&&:filas_validas)
     for (int i = 0; i < 9; i++) {
-
-        printf("Revisando fila %d en thread principal...\n", i);
-
-        if (!verificar_fila(i)) {
-            filas_validas = 0;
-            break;
-        }
+        printf("Thread %d revisando fila %d\n", omp_get_thread_num(), i);
+        filas_validas = filas_validas && verificar_fila(i);
     }
 
     int subcuadros_validos = 1;
 
+    #pragma omp parallel for collapse(2) reduction(&&:subcuadros_validos)
     for (int i = 0; i < 9; i += 3) {
         for (int j = 0; j < 9; j += 3) {
-            if (!verificar_subcuadro(i, j)) {
-                subcuadros_validos = 0;
-                break;
-            }
+            printf("Thread %d revisando subcuadro (%d,%d)\n",
+                   omp_get_thread_num(), i, j);
+
+            subcuadros_validos =
+                subcuadros_validos && verificar_subcuadro(i, j);
         }
     }
 
     if (columnas_validas && filas_validas && subcuadros_validos) {
-        printf("Sudoku Resuelto\n");
+        printf("\nSudoku Resuelto\n");
     } else {
-        printf("Sudoku inválido\n");
+        printf("\nSudoku Inválido\n");
     }
 
     ejecutar_ps(pid_padre);
